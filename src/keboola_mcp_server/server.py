@@ -1,9 +1,10 @@
 """MCP server implementation for Keboola Connection."""
 
 import logging
-from typing import Any, Dict, List, Optional, cast
+from typing import Annotated, Any, Dict, List, Optional, cast
 
 from mcp.server.fastmcp import Context, FastMCP
+from pydantic import Field
 
 from keboola_mcp_server.client import KeboolaClient
 from keboola_mcp_server.config import Config
@@ -13,7 +14,7 @@ from keboola_mcp_server.mcp import (
     SessionState,
     SessionStateFactory,
 )
-from keboola_mcp_server.sql_tools import WorkspaceManager
+from keboola_mcp_server.sql_tools import WorkspaceManager, query_table
 from keboola_mcp_server.storage_tools import add_storage_tools
 
 logger = logging.getLogger(__name__)
@@ -74,6 +75,7 @@ def create_server(config: Optional[Config] = None) -> FastMCP:
         ],
     )
 
+    mcp.add_tool(query_table)
     add_storage_tools(mcp)
 
     @mcp.tool()
