@@ -4,7 +4,8 @@ import pytest
 from kbcstorage.client import Client
 from mcp.server.fastmcp import Context
 
-from keboola_mcp_server.client import KeboolaClient
+from keboola_mcp_server.client import JobsQueue, KeboolaClient
+
 from keboola_mcp_server.sql_tools import WorkspaceManager
 
 
@@ -13,6 +14,7 @@ def keboola_client() -> KeboolaClient:
     """Create a mock jobs client."""
     mock_client = MagicMock(spec=KeboolaClient)
     mock_client.storage_client = MagicMock(spec=Client)
+    mock_client.jobs_queue = MagicMock(spec=JobsQueue)
     return mock_client
 
 
@@ -29,6 +31,7 @@ def mcp_context_client(keboola_client: KeboolaClient, mcp_context: Context) -> C
     context = mcp_context
     context.session.state = {}
     # Mock KeboolaClient
+
     workspace_manager = MagicMock(spec=WorkspaceManager)
     context.session.state["workspace_manager"] = workspace_manager
 
