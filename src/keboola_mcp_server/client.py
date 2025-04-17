@@ -317,7 +317,6 @@ class AIServiceClient(Endpoint):
         """
         super().__init__(root_url, "", token)
 
-        # set the base url to the root url
         self.base_url = self.root_url.rstrip("/")
 
     def get_component_detail(self, component_id: str) -> Dict[str, Any]:
