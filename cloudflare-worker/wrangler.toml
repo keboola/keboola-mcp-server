@@ -1,0 +1,40 @@
+name = "keboola-mcp-server"
+main = "src/index.js"
+compatibility_date = "2023-10-30"
+node_compat = true
+
+# Set up variables or secrets in the Cloudflare Dashboard or with wrangler secret
+# kv_namespaces = [
+#   { binding = "SESSIONS", id = "..." }
+# ]
+
+# Define routes for your Worker
+# routes = [
+#   { pattern = "mcp.yourdomain.com/*", zone_name = "yourdomain.com" }
+# ]
+
+[vars]
+# Environment variables here will be available at build time
+# Runtime variables should be set using `wrangler secret put`
+
+# Configure your CORS settings as needed
+ALLOWED_ORIGINS = "*"
+DEBUG = false
+
+# Default variables
+MCP_SERVER_URL = "https://your-mcp-server-url.example.com"
+
+# Specify a custom destination for the Worker to forward requests to
+# This is just a placeholder - replace with the actual URL of your Python MCP server
+# Set this with a secret in production
+KEBOOLA_API_URL = "https://connection.keboola.com"
+
+# Workers settings
+workers_dev = true
+send_metrics = false
+
+[build]
+command = "npm run build"
+
+[env.production]
+# Production-specific configuration 

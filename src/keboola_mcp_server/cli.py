@@ -23,7 +23,7 @@ def parse_args(args: Optional[list[str]] = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description='Keboola MCP Server')
     parser.add_argument(
         '--transport',
-        choices=['stdio', 'sse'],
+        choices=['stdio', 'sse', 'cloudflare'],
         default='stdio',
         help='Transport to use for MCP communication',
     )
@@ -35,6 +35,12 @@ def parse_args(args: Optional[list[str]] = None) -> argparse.Namespace:
     )
     parser.add_argument(
         '--api-url', default='https://connection.keboola.com', help='Keboola Storage API URL'
+    )
+    parser.add_argument(
+        '--host', default='0.0.0.0', help='Host to bind to when running in server mode'
+    )
+    parser.add_argument(
+        '--port', type=int, default=8000, help='Port to bind to when running in server mode'
     )
 
     return parser.parse_args(args)
@@ -64,9 +70,15 @@ def main(args: Optional[list[str]] = None) -> None:
     )
 
     try:
-        # Create and run server
-        mcp = create_server(config)
-        mcp.run(transport=parsed_args.transport)
+        # Handle Cloudflare mode separately
+        if parsed_args.transport == 'cloudflare':
+            LOG.info("Starting server in Cloudflare mode on %s:%s", parsed_args.host, parsed_args.port)
+            from .cloudflare import run_cloudflare_server
+            run_cloudflare_server(config, host=parsed_args.host, port=parsed_args.port)
+        else:
+            # Create and run server in standard mode
+            mcp = create_server(config)
+            mcp.run(transport=parsed_args.transport)
     except Exception as e:
         LOG.exception(f'Server failed: {e}')
         sys.exit(1)
