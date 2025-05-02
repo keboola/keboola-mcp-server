@@ -114,4 +114,57 @@ export async function callbackHandler(request, context) {
   } catch (error) {
     return new Response(`Authentication error: ${error.message}`, { status: 500 });
   }
+}
+
+/**
+ * Proxy a request to another server
+ * @param {Request} request - The original request
+ * @param {string} targetUrl - The base URL to proxy to
+ * @param {Object} corsHeaders - CORS headers to add to the response
+ * @returns {Response} The proxied response
+ */
+export async function proxyRequest(request, targetUrl, corsHeaders = {}) {
+  try {
+    // Normalize target URL (ensure it ends with a slash if it's a base URL)
+    const normalizedTargetUrl = targetUrl.endsWith('/') ? targetUrl : `${targetUrl}/`
+    
+    // Get URL path components
+    const url = new URL(request.url)
+    const path = url.pathname.startsWith('/mcp') ? url.pathname.substring(4) : url.pathname
+    
+    // Construct target URL
+    const targetFullUrl = `${normalizedTargetUrl}${path.startsWith('/') ? path.substring(1) : path}${url.search}`
+    
+    // Create a new request to forward
+    const proxyRequest = new Request(targetFullUrl, {
+      method: request.method,
+      headers: request.headers,
+      body: request.body,
+      redirect: 'follow',
+    })
+    
+    // Forward the request
+    const response = await fetch(proxyRequest)
+    
+    // Create a new response with the original response
+    const responseHeaders = new Headers(response.headers)
+    
+    // Add CORS headers
+    Object.entries(corsHeaders).forEach(([key, value]) => {
+      responseHeaders.set(key, value)
+    })
+    
+    // Create a new response with the modified headers
+    return new Response(response.body, {
+      status: response.status,
+      statusText: response.statusText,
+      headers: responseHeaders,
+    })
+  } catch (error) {
+    console.error('Proxy error:', error)
+    return new Response('Error proxying request to MCP server', {
+      status: 502,
+      headers: corsHeaders,
+    })
+  }
 } 

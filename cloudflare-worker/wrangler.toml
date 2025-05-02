@@ -3,6 +3,11 @@ main = "src/index.js"
 compatibility_date = "2023-10-30"
 node_compat = true
 
+# KV namespace for user mappings
+kv_namespaces = [
+  { binding = "USER_MAPPINGS", id = "YOUR_KV_NAMESPACE_ID" }
+]
+
 # Set up variables or secrets in the Cloudflare Dashboard or with wrangler secret
 # kv_namespaces = [
 #   { binding = "SESSIONS", id = "..." }

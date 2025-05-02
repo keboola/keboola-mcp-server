@@ -1,7 +1,7 @@
 {
   "name": "keboola-mcp-server-worker",
   "version": "1.0.0",
-  "description": "Cloudflare Worker for Keboola MCP Server with OAuth support",
+  "description": "Cloudflare Worker for Keboola MCP Server with Google OAuth support",
   "main": "src/index.js",
   "scripts": {
     "build": "webpack",
@@ -13,8 +13,10 @@
   "license": "MIT",
   "dependencies": {
     "@cloudflare/workers-oauth-provider": "^1.0.0",
+    "googleapis": "^105.0.0",
     "itty-router": "^3.0.12",
-    "jose": "^4.14.4"
+    "jose": "^4.14.4",
+    "oauth4webapi": "^2.3.0"
   },
   "devDependencies": {
     "jest": "^29.5.0",

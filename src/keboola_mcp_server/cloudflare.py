@@ -24,44 +24,53 @@ LOG = logging.getLogger(__name__)
 
 async def verify_token(request: Request) -> Optional[Dict[str, Any]]:
     """
-    Verify the token from the request headers.
+    Verify the OAuth token from the request headers.
     
-    Args:
-        request: The incoming HTTP request
-        
-    Returns:
-        Dict containing user claims if token is valid, None otherwise
+    The token can be provided in the following ways:
+    1. Authorization header (Bearer token)
+    2. X-Keboola-Token header
+    3. token query parameter (for backward compatibility)
+    
+    Returns user claims if the token is valid, None otherwise.
     """
-    # Check for Authorization header
-    auth_header = request.headers.get('Authorization')
-    if auth_header and auth_header.startswith('Bearer '):
-        token = auth_header.replace('Bearer ', '')
-    else:
-        # Check for X-Keboola-Token header (coming from Cloudflare Worker)
-        token = request.headers.get('X-Keboola-Token')
+    # Check authorization header first
+    auth_header = request.headers.get("Authorization")
+    token = None
     
-    # If no token is found, check if it's in query params (for backward compatibility)
+    if auth_header and auth_header.startswith("Bearer "):
+        token = auth_header[7:]
+    
+    # If no token in auth header, check X-Keboola-Token header
     if not token:
-        token = request.query_params.get('storage_token')
+        token = request.headers.get("X-Keboola-Token")
+    
+    # If still no token, check query parameters (for backward compatibility)
+    if not token and "token" in request.query_params:
+        token = request.query_params["token"]
     
     if not token:
+        LOG.warning("No token provided in request")
         return None
     
-    # Get user information from headers
-    user_id = request.headers.get('X-Keboola-User-Id', 'unknown-user')
-    user_email = request.headers.get('X-Keboola-User-Email', '')
+    # Get user information from headers set by the Cloudflare Worker
+    user_email = request.headers.get("X-Keboola-User-Email")
     
-    # In a real production scenario, we would validate the token with Keboola API
-    # For now, we'll just assume it's valid and create claims
+    if not user_email:
+        LOG.warning("No user email provided in request headers")
+        return None
     
-    # Create claims with user information and token
+    # In a real implementation, we might validate the token with Keboola API
+    # For now, we'll trust that the Cloudflare Worker has already validated the token
+    
+    # Create claims with user information and permissions
     claims = {
-        'sub': user_id,
-        'email': user_email,
-        'token': token,
-        'permissions': ['read', 'write'],  # This would come from Keboola in production
+        "sub": user_email,
+        "email": user_email,
+        "token": token,
+        "permissions": ["read", "write"],  # Modify based on your requirements
     }
     
+    LOG.info(f"User authenticated: {user_email}")
     return claims
 
 
@@ -77,17 +86,19 @@ class AuthenticatedSseTransport(SseServerTransport):
         claims = await verify_token(request)
         if not claims:
             return JSONResponse(
-                {'error': 'Unauthorized', 'message': 'Invalid or missing authentication'},
+                {"error": "Unauthorized. Valid authentication token required."},
                 status_code=401,
             )
         
-        # Get query parameters and add token
-        params = dict(request.query_params)
-        if claims.get('token'):
-            params['storage_token'] = claims['token']
+        # Extract query parameters except token
+        query_params = {
+            key: value
+            for key, value in request.query_params.items()
+            if key != "token"
+        }
         
-        # Continue with normal SSE handling
-        return await super().handle_request(request)
+        # Handle SSE request
+        return await super().handle_request(request, query_params=query_params)
 
 
 async def create_cloudflare_app(config: Optional[Config] = None) -> Starlette:
