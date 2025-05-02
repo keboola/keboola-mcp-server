@@ -1,4 +1,4 @@
-name = "keboola-mcp-server"
+name = "keboola-test-mcp"
 main = "src/index.js"
 compatibility_date = "2023-10-30"
 compatibility_flags = ["nodejs_compat"]
@@ -18,7 +18,7 @@ ALLOWED_ORIGINS = "*"
 DEBUG = false
 
 # Default variables (these will be overridden by secrets)
-MCP_SERVER_URL = "https://your-mcp-server-url.example.com"
+MCP_SERVER_URL = "https://mcp.canary-orion.keboola.dev"
 KEBOOLA_API_URL = "https://connection.keboola.com"
 
 # Workers settings
@@ -26,7 +26,6 @@ workers_dev = true
 send_metrics = false
 
 [build]
-command = "npm run build"
 
 [env.production]
 # Production-specific configuration 

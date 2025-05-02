@@ -1,80 +1,31 @@
 import { Router } from 'itty-router';
-import { OAuthProvider } from '@cloudflare/workers-oauth-provider';
-import { handleProxy } from './proxy';
-import { 
-  handleAuthorize, 
-  handleAuthorizeCallback, 
-  handleToken, 
-  verifyToken 
-} from './oauth';
 import { proxyRequest } from './proxy';
 
 // Create router
 const router = Router();
 
 /**
- * Create a custom auth handler that integrates with Keboola OAuth
+ * Extract Keboola token from request
+ * @param {Request} request - The incoming request
+ * @returns {string|null} The token or null if not found
  */
-const customAuthHandler = {
-  /**
-   * Handle authorization endpoint
-   */
-  handleAuthorize: async (request, context) => {
-    return handleAuthorize(request, context.env);
-  },
-
-  /**
-   * Handle the token endpoint
-   */
-  handleToken: async (request, context) => {
-    return handleToken(request, context.env);
-  },
-
-  /**
-   * Extract claims from a request
-   */
-  extractClaims: async (request, context) => {
-    const claims = await verifyToken(request, context.env);
-    return claims;
-  },
-
-  /**
-   * Handle registration
-   */
-  handleRegister: async (request, context) => {
-    // In a production implementation, this would handle client registration
-    // For now, we'll return a mock client
-    return new Response(JSON.stringify({
-      client_id: 'mcp-client-id',
-      client_secret: 'mcp-client-secret',
-    }), {
-      headers: { 'Content-Type': 'application/json' }
-    });
+function extractToken(request) {
+  // First try from Authorization header
+  const authHeader = request.headers.get('Authorization');
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    return authHeader.substring(7);
   }
-};
-
-/**
- * Create OAuth provider 
- * - apiRoute: Route for the MCP server
- * - apiHandler: Proxy handler for MCP requests
- * - defaultHandler: Default handler for non-OAuth routes
- * - authorizeEndpoint: OAuth authorization endpoint
- * - tokenEndpoint: OAuth token endpoint
- * - clientRegistrationEndpoint: OAuth client registration endpoint
- */
-const provider = new OAuthProvider({
-  apiRoute: '/mcp',
-  apiHandler: handleProxy,
-  defaultHandler: async (request) => {
-    return new Response('Keboola MCP Server: OAuth Authentication Enabled', {
-      headers: { 'content-type': 'text/plain' },
-    });
-  },
-  authorizeEndpoint: '/authorize',
-  tokenEndpoint: '/token',
-  clientRegistrationEndpoint: '/register',
-  authHandler: customAuthHandler,
-});
+  
+  // Then try from X-Keboola-Token header
+  const kebolaHeader = request.headers.get('X-Keboola-Token');
+  if (kebolaHeader) {
+    return kebolaHeader;
+  }
+  
+  // Finally try from query string
+  const url = new URL(request.url);
+  return url.searchParams.get('token');
+}
 
 // Basic routes
 router.get('/', async () => {
@@ -90,40 +41,34 @@ router.get('/health', async () => {
   });
 });
 
-// Custom authorize callback route
-router.post('/authorize/callback', async (request, env, ctx) => {
-  return handleAuthorizeCallback(request, env);
-});
-
-// Admin route to add user mappings
-router.post('/admin/user-mapping', async (request, env) => {
-  // In a real implementation, you would validate admin credentials
-  try {
-    const { email, kebolaToken } = await request.json();
-    
-    if (!email || !kebolaToken) {
-      return new Response('Missing required fields', { status: 400 });
-    }
-    
-    // Store in KV
-    await USER_MAPPINGS.put(email, kebolaToken);
-    
-    return new Response(JSON.stringify({ success: true }), {
-      headers: { 'Content-Type': 'application/json' }
+// MCP proxy route
+router.all('/mcp*', async (request, env) => {
+  // Extract token
+  const token = extractToken(request);
+  
+  if (!token) {
+    return new Response('Unauthorized: Missing token', { 
+      status: 401,
+      headers: { 'WWW-Authenticate': 'Bearer' }
     });
-  } catch (error) {
-    return new Response('Invalid request', { status: 400 });
   }
+  
+  // Create a new request with the token added as a header
+  const mcpRequest = new Request(request);
+  mcpRequest.headers.set('X-Keboola-Token', token);
+  
+  // Proxy the request to the Python MCP server
+  return await proxyRequest(mcpRequest, env.MCP_SERVER_URL);
 });
 
-// OAuth provider handles all OAuth-related routes and MCP routes
+// Export default handler
 export default {
   async fetch(request, env, ctx) {
     // Add CORS headers to all responses
     const corsHeaders = {
       'Access-Control-Allow-Origin': env.ALLOWED_ORIGINS || '*',
       'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Keboola-Token',
     };
     
     // Handle preflight requests
@@ -133,70 +78,20 @@ export default {
       });
     }
     
-    // Try to match routes first
-    const url = new URL(request.url);
-    
-    // Health check and basic routes
-    if (url.pathname === '/health' || url.pathname === '/' || url.pathname === '/authorize/callback' || url.pathname.startsWith('/admin/')) {
-      const response = await router.handle(request, env);
-      // Add CORS headers to the response
-      Object.entries(corsHeaders).forEach(([key, value]) => {
-        response.headers.set(key, value);
-      });
-      return response;
-    }
-    
-    // Let the OAuth provider handle OAuth-related requests
-    if (url.pathname === '/authorize' || url.pathname === '/token' || url.pathname === '/register') {
-      const response = await provider.handleRequest(request, env);
-      // Add CORS headers to the response
-      Object.entries(corsHeaders).forEach(([key, value]) => {
-        response.headers.set(key, value);
-      });
-      return response;
-    }
-    
-    // If /mcp path, try to handle as MCP request
-    if (url.pathname.startsWith('/mcp')) {
-      // Let the OAuth provider handle it, which will delegate to our handler if authenticated
-      const response = await provider.handleRequest(request, env);
-      
-      // Add CORS headers
-      Object.entries(corsHeaders).forEach(([key, value]) => {
-        response.headers.set(key, value);
-      });
-      
-      return response;
-    }
-    
-    // If we get here, it means no routes matched
-    // Proxy the request to the Python MCP server
+    // Try to match routes
+    let response;
     try {
-      const claims = await verifyToken(request);
-      
-      if (!claims) {
-        return new Response('Unauthorized', { 
-          status: 401,
-          headers: {
-            ...corsHeaders,
-            'WWW-Authenticate': 'Bearer'
-          }
-        });
-      }
-      
-      // Add Keboola-specific headers to the request
-      const mcpRequest = new Request(request);
-      mcpRequest.headers.set('X-Keboola-User-Email', claims.email);
-      mcpRequest.headers.set('X-Keboola-Token', claims.keboola_token);
-      
-      // Proxy the request to the Python MCP server
-      return await proxyRequest(mcpRequest, env.MCP_SERVER_URL, corsHeaders);
+      response = await router.handle(request, env, ctx);
     } catch (error) {
       console.error('Error handling request:', error);
-      return new Response('Internal Server Error', { 
-        status: 500,
-        headers: corsHeaders
-      });
+      response = new Response('Internal Server Error', { status: 500 });
     }
+    
+    // Add CORS headers to the response
+    Object.entries(corsHeaders).forEach(([key, value]) => {
+      response.headers.set(key, value);
+    });
+    
+    return response;
   },
 }; 

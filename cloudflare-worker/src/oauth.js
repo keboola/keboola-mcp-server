@@ -4,7 +4,6 @@
  */
 
 import * as oauth from 'oauth4webapi'
-import { Response } from 'itty-router'
 
 // Google OAuth configuration
 const googleConfig = {

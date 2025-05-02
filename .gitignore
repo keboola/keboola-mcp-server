@@ -16,3 +16,29 @@ wheels/
 coverage.xml
 htmlcov/
 test-results.xml
+
+# Node.js
+node_modules/
+npm-debug.log
+yarn-debug.log
+yarn-error.log
+package-lock.json
+yarn.lock
+
+# Cloudflare Worker
+.wrangler/
+cloudflare-worker/dist/
+cloudflare-worker/node_modules/
+test-worker/dist/
+test-worker/node_modules/
+
+# Environment files
+.env.local
+.env.development
+.env.test
+.env.production
+.dev.vars
+
+# OS specific
+.DS_Store
+Thumbs.db

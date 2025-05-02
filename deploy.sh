@@ -1,14 +1,31 @@
 #!/bin/bash
 set -e
 
+# Load environment variables from .env file
+if [ -f .env ]; then
+    echo "Loading environment variables from .env file..."
+    export $(grep -v '^#' .env | xargs)
+else
+    echo "ERROR: .env file not found."
+    echo "Please create a .env file based on .env.example and set the required variables."
+    exit 1
+fi
+
 # Configuration
 WORKER_DIR="cloudflare-worker"
 PYTHON_SERVER_URL=${PYTHON_SERVER_URL:-"https://your-python-server-url.example.com"}
 KEBOOLA_API_URL=${KEBOOLA_API_URL:-"https://connection.keboola.com"}
-GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-""}
-GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-""}
-GOOGLE_REDIRECT_URI=${GOOGLE_REDIRECT_URI:-""}
 CLIENT_ID=${CLIENT_ID:-"mcp-client"}
+CLOUDFLARE_ACCOUNT_ID=${CLOUDFLARE_ACCOUNT_ID:-""}
+
+# Check if Cloudflare account ID is set
+if [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+    echo "ERROR: CLOUDFLARE_ACCOUNT_ID is not set in .env file"
+    echo "Please set it to your Cloudflare account ID"
+    echo "You can find your account ID in the Cloudflare dashboard URL:"
+    echo "https://dash.cloudflare.com/<account-id>"
+    exit 1
+fi
 
 # Build and deploy Python MCP server
 echo "Building Python MCP server..."
@@ -27,44 +44,19 @@ cd "$WORKER_DIR"
 echo "Installing Worker dependencies..."
 npm install
 
+# Update account ID in wrangler.toml
+echo "Updating Cloudflare account ID in wrangler.toml..."
+sed -i.bak "s/account_id = \".*\"/account_id = \"$CLOUDFLARE_ACCOUNT_ID\"/g" wrangler.toml && rm wrangler.toml.bak
+
 # Set environment variables for Wrangler
 echo "Configuring Worker environment..."
 wrangler secret put MCP_SERVER_URL <<< "$PYTHON_SERVER_URL"
 wrangler secret put KEBOOLA_API_URL <<< "$KEBOOLA_API_URL"
 wrangler secret put CLIENT_ID <<< "$CLIENT_ID"
 
-if [ -n "$GOOGLE_CLIENT_ID" ]; then
-    wrangler secret put GOOGLE_CLIENT_ID <<< "$GOOGLE_CLIENT_ID"
-fi
-
-if [ -n "$GOOGLE_CLIENT_SECRET" ]; then
-    wrangler secret put GOOGLE_CLIENT_SECRET <<< "$GOOGLE_CLIENT_SECRET"
-fi
-
-if [ -n "$GOOGLE_REDIRECT_URI" ]; then
-    wrangler secret put GOOGLE_REDIRECT_URI <<< "$GOOGLE_REDIRECT_URI"
-fi
-
-# Create KV namespace if it doesn't exist
-echo "Setting up KV namespace for user mappings..."
-KV_NAMESPACE_ID=$(wrangler kv:namespace list | grep USER_MAPPINGS | awk '{print $2}')
-
-if [ -z "$KV_NAMESPACE_ID" ]; then
-    echo "Creating new KV namespace..."
-    KV_NAMESPACE_ID=$(wrangler kv:namespace create USER_MAPPINGS | grep -oP 'id = "\K[^"]+')
-    
-    # Update wrangler.toml with the KV namespace ID
-    sed -i.bak "s/YOUR_KV_NAMESPACE_ID/$KV_NAMESPACE_ID/g" wrangler.toml
-    rm wrangler.toml.bak
-    
-    echo "Created KV namespace with ID: $KV_NAMESPACE_ID"
-else
-    echo "Using existing KV namespace with ID: $KV_NAMESPACE_ID"
-fi
-
 # Deploy the worker
 echo "Deploying Worker to Cloudflare..."
-wrangler publish
+wrangler deploy
 
 # Return to the root directory
 cd ..
@@ -75,9 +67,7 @@ echo "Next steps:"
 echo "1. Configure your Python MCP server to run in Cloudflare mode:"
 echo "   python -m keboola_mcp_server.cli --transport cloudflare --host 0.0.0.0 --port 8000"
 echo ""
-echo "2. Add user mappings using the admin endpoint:"
-echo "   curl -X POST https://your-worker-url.workers.dev/admin/user-mapping \\"
-echo "     -H 'Content-Type: application/json' \\"
-echo "     -d '{\"email\":\"user@example.com\",\"kebolaToken\":\"your-keboola-api-token\"}'"
+echo "2. Test the MCP server with your Keboola token:"
+echo "   curl -H 'X-Keboola-Token: your-keboola-api-token' https://your-worker-url.workers.dev/mcp/sse"
 echo ""
 echo "3. Register your MCP server with Anthropic Integrations" 

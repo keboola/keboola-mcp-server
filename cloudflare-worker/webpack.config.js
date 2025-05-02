@@ -22,4 +22,12 @@ module.exports = {
       "buffer": false,
     },
   },
+  module: {
+    rules: [
+      {
+        test: /cloudflare:\/\/.*$/,
+        loader: 'null-loader',
+      },
+    ],
+  },
 }; 
