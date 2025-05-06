@@ -1,0 +1,13 @@
+name = "keboola-mcp-server"
+main = "worker.js"
+compatibility_date = "2023-09-04"
+account_id = "b60618d22bd084a130391a0a358008d7"
+workers_dev = true
+
+[vars]
+MCP_SERVER_URL = "https://api.keboola.com/mcp-server"
+KEBOOLA_API_URL = "https://connection.keboola.com"
+CLIENT_ID = "keboola-mcp-server"
+
+[triggers]
+crons = []
