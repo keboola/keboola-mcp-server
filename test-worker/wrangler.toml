@@ -1,0 +1,22 @@
+name = "keboola-test-mcp"
+main = "src/index.js"
+compatibility_date = "2023-10-30"
+compatibility_flags = ["nodejs_compat"]
+account_id = "b60618d22bd084a130391a0a358008d7"
+
+# Workers settings
+workers_dev = true
+send_metrics = false
+
+# Default variables
+[vars]
+ALLOWED_ORIGINS = "*"
+DEBUG = "false"
+MCP_SERVER_URL = "https://mcp.canary-orion.keboola.dev"
+KEBOOLA_API_URL = "https://connection.keboola.com"
+
+# The following values should be set as secrets in production
+# Use: wrangler secret put GOOGLE_CLIENT_ID
+# GOOGLE_CLIENT_ID = ""
+# GOOGLE_CLIENT_SECRET = ""
+# GOOGLE_REDIRECT_URI = "https://keboola-test-mcp.keboola-hacker-house.workers.dev/authorize/callback" 
