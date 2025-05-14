@@ -18,7 +18,7 @@ Keboola MCP Server is an open-source bridge between your Keboola project and mod
 
 Make sure you have:
 - [ ] Python 3.10+ installed
-- [ ] Access to a Keboola project with admin rights
+- [ ] Access to a Keboola project
 - [ ] Your preferred MCP client (Claude, Cursor, etc.)
 
 **Note**: Make sure you have `uv` installed. The MCP client will use it to automatically download and run the Keboola MCP Server. 
