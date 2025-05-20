@@ -14,6 +14,7 @@ class Config:
     """Server configuration."""
 
     storage_token: Optional[str] = None
+    jwt_token: Optional[str] = None
     storage_api_url: str = 'https://connection.keboola.com'
     workspace_schema: Optional[str] = None
 

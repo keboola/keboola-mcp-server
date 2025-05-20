@@ -31,7 +31,15 @@ def _create_session_state_factory(config: Optional[Config] = None) -> SessionSta
         state: SessionState = {}
         # Create Keboola client instance
         try:
-            client = KeboolaClient(cfg.storage_token, cfg.storage_api_url)
+            # Prioritize jwt_token, fallback to storage_token, then error if neither is present
+            token_to_use = cfg.jwt_token if cfg.jwt_token else cfg.storage_token
+            LOG.info(f"token_to_use: {token_to_use}")
+            if not token_to_use:
+                # Log and raise an error if no token is available
+                LOG.error('Failed to initialize Keboola client: Missing jwt_token or storage_token.')
+                raise ValueError('Authentication token (jwt_token or storage_token) is required.')
+
+            client = KeboolaClient(token_to_use, cfg.storage_api_url)
             state[KeboolaClient.STATE_KEY] = client
             LOG.info('Successfully initialized Storage API client.')
         except Exception as e:

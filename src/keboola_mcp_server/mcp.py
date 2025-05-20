@@ -140,16 +140,32 @@ class KeboolaMcpServer(FastMCP):
         from starlette.applications import Starlette
         from starlette.requests import Request
         from starlette.routing import Mount, Route
+        from starlette.datastructures import Headers
 
         sse = SseServerTransport('/messages/')
 
         async def handle_sse(request: Request):
+            token = None
+            if 'jwt-token' in request.headers:
+                token = request.headers['jwt-token']
+            elif 'jwt_token' in request.query_params: # Fallback to query param
+                token = request.query_params['jwt_token']
+            
+            if not token:
+                # Handle missing token, e.g., return an error response or raise exception
+                # For now, proceeding with empty params if no token, adjust as needed
+                params = {}
+            else:
+                # Pass the token in a way that session_state_factory can use it.
+                # Assuming session_state_factory will be updated to look for 'jwt_token'.
+                params = {'jwt_token': token}
+
             async with sse.connect_sse(request.scope, request.receive, request._send) as streams:
                 await self._mcp_server.run(
                     streams[0],
                     streams[1],
                     initialization_options=self._mcp_server.create_initialization_options(),
-                    state=self._session_state_factory(dict(request.query_params)),
+                    state=self._session_state_factory(params), # Use extracted/constructed params
                 )
 
         starlette_app = Starlette(

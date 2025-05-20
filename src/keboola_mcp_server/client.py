@@ -33,16 +33,16 @@ class KeboolaClient:
 
     def __init__(
         self,
-        storage_api_token: str,
+        api_token: str,
         storage_api_url: str = 'https://connection.keboola.com',
     ) -> None:
         """
         Initialize the client.
 
-        :param storage_api_token: Keboola Storage API token
+        :param api_token: Keboola API token (can be a Storage API token or JWT)
         :param storage_api_url: Keboola Storage API URL
         """
-        self.token = storage_api_token
+        self.token = api_token
         # Ensure the base URL has a scheme
         if not storage_api_url.startswith(('http://', 'https://')):
             storage_api_url = f'https://{storage_api_url}'
@@ -54,6 +54,7 @@ class KeboolaClient:
         queue_api_url = f'{self._PREFIX_QUEUE_API_URL}{storage_api_url.split(self._PREFIX_STORAGE_API_URL)[1]}'
         ai_service_api_url = f'{self._PREFIX_AISERVICE_API_URL}{storage_api_url.split(self._PREFIX_STORAGE_API_URL)[1]}'
 
+        LOG.info(f"storage_api_url: {storage_api_url}")
         # Initialize clients for individual services
         self.storage_client_sync = SyncStorageClient(storage_api_url, self.token)
         self.storage_client = AsyncStorageClient.create(root_url=storage_api_url, token=self.token)
@@ -71,11 +72,27 @@ class RawKeboolaClient:
 
     def __init__(self, base_api_url: str, api_token: str, headers: dict[str, Any] | None = None) -> None:
         self.base_api_url = base_api_url
-        self.headers = {
-            'X-StorageApi-Token': api_token,
+        
+        common_headers = {
             'Content-Type': 'application/json',
             'Accept-encoding': 'gzip',
         }
+
+        print(f"api_token: {api_token}")
+        # Heuristic to check if the token is a JWT (contains at least two dots)
+        if api_token and api_token.count('.') >= 2:
+            LOG.debug('Using JWT Bearer token for Authorization header.')
+            self.headers = {
+                'Authorization': f'Bearer {api_token}',
+                **common_headers,
+            }
+        else:
+            LOG.debug('Using X-StorageApi-Token header.')
+            self.headers = {
+                'X-StorageApi-Token': api_token,
+                **common_headers,
+            }
+
         if headers:
             self.headers.update(headers)
 
@@ -569,3 +586,4 @@ class AIServiceClient(KeboolaServiceClient):
         )
 
         return DocsQuestionResponse.model_validate(response)
+
