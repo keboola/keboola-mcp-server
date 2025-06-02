@@ -356,6 +356,7 @@ async def create_sql_transformation(
                 'description': description,
                 'configuration': transformation_configuration_payload.model_dump(),
             },
+            mcp_context=ctx.mcp_context,
         ),
     )
 
@@ -439,6 +440,7 @@ async def update_sql_transformation_configuration(
         change_description=change_description,
         updated_description=updated_description if updated_description else None,
         is_disabled=is_disabled,
+        mcp_context=ctx.mcp_context,
     )
 
     transformation = await _get_component(client=client, component_id=sql_transformation_id)
@@ -527,6 +529,13 @@ async def create_component_root_configuration(
 
     configuration_payload = {'storage': storage, 'parameters': parameters}
 
+    # Construct the mcp_context for event logging
+    # using attributes from FastMCP's Context object
+    tool_event_context = {
+        "tool_name": "create_component_root_configuration",  # Typically holds the tool's registered name
+        "tool_args": parameters # Typically holds the resolved arguments for the tool
+    }
+
     new_raw_configuration = cast(
         dict[str, Any],
         await client.storage_client.create_component_root_configuration(
@@ -536,6 +545,7 @@ async def create_component_root_configuration(
                 'description': description,
                 'configuration': configuration_payload,
             },
+            mcp_context=tool_event_context, # Pass the constructed context
         ),
     )
 
@@ -646,6 +656,7 @@ async def create_component_row_configuration(
                 'description': description,
                 'configuration': configuration_payload,
             },
+            mcp_context=ctx.mcp_context,
         ),
     )
 
@@ -759,6 +770,7 @@ async def update_component_root_configuration(
                 'changeDescription': change_description,
                 'configuration': configuration_payload,
             },
+            mcp_context=ctx.mcp_context,
         ),
     )
 
@@ -879,6 +891,7 @@ async def update_component_row_configuration(
                 'changeDescription': change_description,
                 'configuration': configuration_payload,
             },
+            mcp_context=ctx.mcp_context,
         ),
     )
 
