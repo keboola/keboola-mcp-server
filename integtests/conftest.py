@@ -4,6 +4,7 @@ import json
 import logging
 import os
 import random
+import uuid
 from contextlib import _AsyncGeneratorContextManager, asynccontextmanager
 from dataclasses import dataclass
 from multiprocessing import Process
@@ -270,6 +271,12 @@ def configs(keboola_project: ProjectDef) -> list[ConfigDef]:
 @pytest.fixture
 def keboola_client(storage_api_token: str, storage_api_url: str) -> KeboolaClient:
     return KeboolaClient(storage_api_token=storage_api_token, storage_api_url=storage_api_url)
+
+
+@pytest.fixture
+def unique_id() -> str:
+    """Generates a unique ID string for test resources."""
+    return str(uuid.uuid4())[:8]
 
 
 @pytest.fixture
