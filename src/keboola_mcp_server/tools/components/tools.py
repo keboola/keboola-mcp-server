@@ -341,13 +341,13 @@ async def create_sql_transformation(
       and user intent.
 
     USAGE:
-    - Use when you want to create a new SQL transformation.
+    - Use when the user clearly asks for or implies creating a new SQL transformation.
 
     EXAMPLES:
     - user_input: `Can you save me the SQL query you generated as a new transformation?`
         - set the sql_statements to the query, and set other parameters accordingly.
         - returns the created SQL transformation configuration if successful.
-    - user_input: `Generate me an SQL transformation which [USER INTENT]`
+    - user_input: `Create me an SQL transformation which [USER INTENT]`
         - set the sql_statements to the query based on the [USER INTENT], and set other parameters accordingly.
         - returns the created SQL transformation configuration if successful.
     """

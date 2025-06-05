@@ -288,7 +288,7 @@ def _get_transformation_configuration(
     parameters = TransformationConfiguration.Parameters(
         blocks=[
             TransformationConfiguration.Parameters.Block(
-                name='Blocks',
+                name='Block',
                 codes=list(codes),
             )
         ]
