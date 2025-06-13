@@ -10,6 +10,7 @@ from pydantic import AliasChoices, BaseModel, Field, model_validator
 from keboola_mcp_server.client import JsonDict, KeboolaClient
 from keboola_mcp_server.config import MetadataField
 from keboola_mcp_server.errors import tool_errors
+from keboola_mcp_server.links import Link, ProjectLinksManager
 from keboola_mcp_server.mcp import KeboolaMcpServer, with_session_state
 from keboola_mcp_server.tools.workspace import WorkspaceManager
 
@@ -71,6 +72,7 @@ class BucketDetail(BaseModel):
         validation_alias=AliasChoices('tablesCount', 'tables_count', 'tables-count'),
         serialization_alias='tablesCount',
     )
+    links: Optional[list[Link]] = Field(default=None, description='The links relevant to the bucket.')
 
     @model_validator(mode='before')
     @classmethod
@@ -135,6 +137,7 @@ class TableDetail(BaseModel):
         validation_alias=AliasChoices('fullyQualifiedName', 'fully_qualified_name', 'fully-qualified-name'),
         serialization_alias='fullyQualifiedName',
     )
+    links: Optional[list[Link]] = Field(default=None, description='The links relevant to the table.')
 
     @model_validator(mode='before')
     @classmethod
@@ -156,10 +159,13 @@ async def get_bucket_detail(
 ) -> BucketDetail:
     """Gets detailed information about a specific bucket."""
     client = KeboolaClient.from_state(ctx.session.state)
+    links_manager = await ProjectLinksManager.from_client(client)
     assert isinstance(client, KeboolaClient)
     raw_bucket = await client.storage_client.bucket_detail(bucket_id)
+    links = links_manager.get_bucket_links(bucket_id, raw_bucket.get('name') or bucket_id)
+    bucket = BucketDetail.model_validate(raw_bucket | {'links': links})
 
-    return BucketDetail.model_validate(raw_bucket)
+    return bucket
 
 
 @tool_errors()
@@ -170,7 +176,10 @@ async def retrieve_buckets(ctx: Context) -> list[BucketDetail]:
     assert isinstance(client, KeboolaClient)
     raw_bucket_data = await client.storage_client.bucket_list()
 
-    return [BucketDetail.model_validate(raw_bucket) for raw_bucket in raw_bucket_data]
+    return [
+        BucketDetail.model_validate(bucket)
+        for bucket in raw_bucket_data
+    ]
 
 
 @tool_errors()
@@ -181,6 +190,7 @@ async def get_table_detail(
     """Gets detailed information about a specific table including its DB identifier and column information."""
     client = KeboolaClient.from_state(ctx.session.state)
     workspace_manager = WorkspaceManager.from_state(ctx.session.state)
+    links_manager = await ProjectLinksManager.from_client(client)
 
     raw_table = await client.storage_client.table_detail(table_id)
     raw_columns = cast(list[str], raw_table.get('columns', []))
@@ -189,12 +199,14 @@ async def get_table_detail(
     ]
 
     table_fqn = await workspace_manager.get_table_fqn(raw_table)
+    links = links_manager.get_table_links(raw_table['bucket']['id'], raw_table['name'])
 
     return TableDetail.model_validate(
         raw_table
         | {
             'columns': column_info,
             'fully_qualified_name': table_fqn.identifier if table_fqn else None,
+            'links': links
         }
     )
 
